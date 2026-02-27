@@ -68,14 +68,12 @@ def save_json(path: Path, data: list) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def fetch_articles_for_client(client: dict, domains: str, from_date: str) -> list:
+def fetch_articles_for_client(client: dict, from_date: str) -> list:
     """Fetch articles from NewsAPI for a single client."""
     query = client["aliases"][0]
     params = {
         "q": query,
-        "domains": domains,
         "from": from_date,
-        "language": "en",
         "sortBy": "relevancy",
         "pageSize": 10,
         "apiKey": NEWSAPI_KEY,
@@ -265,7 +263,6 @@ def main():
     clients = load_json(CLIENTS_PATH)
     sources = load_json(SOURCES_PATH)
     active_clients = [c for c in clients if c.get("active", False)]
-    domains = ",".join(s["domain"] for s in sources)
 
     today = datetime.utcnow()
     from_date = (today - timedelta(days=7)).strftime("%Y-%m-%d")
@@ -273,7 +270,7 @@ def main():
 
     print(f"\nDate: {date_str}")
     print(f"Active clients: {len(active_clients)}")
-    print(f"Sources: {len(sources)} ({domains[:80]}...)")
+    print(f"Sources: {len(sources)}")
     print(f"Fetching articles from: {from_date}\n")
 
     # Fetch articles for each client
@@ -283,7 +280,7 @@ def main():
     for client in active_clients:
         try:
             print(f"  Fetching: {client['name']} (query: \"{client['aliases'][0]}\")")
-            articles = fetch_articles_for_client(client, domains, from_date)
+            articles = fetch_articles_for_client(client, from_date)
             print(f"    → {len(articles)} articles")
             all_articles.extend(articles)
         except requests.RequestException as e:
