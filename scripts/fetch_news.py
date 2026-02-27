@@ -95,6 +95,24 @@ def fetch_articles_for_client(client: dict, from_date: str) -> list:
     return articles
 
 
+def filter_by_sources(articles: list, sources: list) -> list:
+    """Keep articles from known sources. If no sources configured, keep all."""
+    if not sources:
+        return articles
+    domains = [s["domain"].lower() for s in sources]
+    matched = []
+    unmatched = []
+    for art in articles:
+        url = art.get("url", "").lower()
+        source_name = art.get("source_name", "").lower()
+        if any(d in url or d.replace(".", " ") in source_name for d in domains):
+            matched.append(art)
+        else:
+            unmatched.append(art)
+    # Keep all articles — matched sources first, then the rest
+    return matched + unmatched
+
+
 def deduplicate_articles(articles: list) -> list:
     """Remove duplicate articles by URL."""
     seen = set()
@@ -295,6 +313,14 @@ def main():
     all_articles = deduplicate_articles(all_articles)
     total_deduped = len(all_articles)
     print(f"\nTotal articles: {total_raw} raw → {total_deduped} after dedup")
+
+    # Source filtering (known sources prioritised, all kept)
+    all_articles = filter_by_sources(all_articles, sources)
+    known = sum(
+        1 for a in all_articles
+        if any(d in a.get("url", "").lower() for d in [s["domain"].lower() for s in sources])
+    )
+    print(f"Source match: {known} from known sources, {total_deduped - known} other")
 
     # Filter with Claude
     print(f"\nFiltering {total_deduped} articles with Claude ({CLAUDE_MODEL})...")
