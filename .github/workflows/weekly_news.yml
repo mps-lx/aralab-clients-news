@@ -1,10 +1,10 @@
 name: Weekly Client News
-
 on:
   schedule:
     - cron: '0 7 * * 1'
   workflow_dispatch:
-
+permissions:
+  contents: write
 jobs:
   fetch-news:
     runs-on: ubuntu-latest
