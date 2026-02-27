@@ -1,0 +1,18 @@
+[
+  {"name": "Jornal de Negócios", "domain": "jornaldenegocios.pt", "language": "pt", "market": "PT"},
+  {"name": "Dinheiro Vivo", "domain": "dinheirovivo.pt", "language": "pt", "market": "PT"},
+  {"name": "Expresso", "domain": "expresso.pt", "language": "pt", "market": "PT"},
+  {"name": "Público", "domain": "publico.pt", "language": "pt", "market": "PT"},
+  {"name": "ECO", "domain": "eco.pt", "language": "pt", "market": "PT"},
+  {"name": "Expansión", "domain": "expansion.com", "language": "es", "market": "ES"},
+  {"name": "El Economista", "domain": "eleconomista.es", "language": "es", "market": "ES"},
+  {"name": "Cinco Días", "domain": "cincodias.elpais.com", "language": "es", "market": "ES"},
+  {"name": "Handelsblatt", "domain": "handelsblatt.com", "language": "de", "market": "DE"},
+  {"name": "Manager Magazin", "domain": "manager-magazin.de", "language": "de", "market": "DE"},
+  {"name": "Les Échos", "domain": "lesechos.fr", "language": "fr", "market": "FR"},
+  {"name": "Le Figaro Économie", "domain": "lefigaro.fr", "language": "fr", "market": "FR"},
+  {"name": "Reuters", "domain": "reuters.com", "language": "en", "market": "EU"},
+  {"name": "Financial Times", "domain": "ft.com", "language": "en", "market": "EU"},
+  {"name": "Bloomberg", "domain": "bloomberg.com", "language": "en", "market": "EU"},
+  {"name": "The Guardian Business", "domain": "theguardian.com", "language": "en", "market": "EU"}
+]

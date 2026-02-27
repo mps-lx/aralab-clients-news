@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aralab Client Intelligence</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    :root {
+      --bg: #0a0a0a;
+      --bg-card: #141414;
+      --border: #1e1e1e;
+      --text: #e8e8e8;
+      --text-secondary: #888;
+      --accent: #00c896;
+      --accent-dim: rgba(0, 200, 150, 0.12);
+      --control-bg: #111;
+      --control-border: #2a2a2a;
+    }
+
+    .light {
+      --bg: #f5f5f5;
+      --bg-card: #ffffff;
+      --border: #e0e0e0;
+      --text: #1a1a1a;
+      --text-secondary: #666;
+      --accent: #00a87a;
+      --accent-dim: rgba(0, 168, 122, 0.1);
+      --control-bg: #fff;
+      --control-border: #d0d0d0;
+    }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      transition: background 0.2s, color 0.2s;
+    }
+
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 20px;
+    }
+
+    /* Header */
+    header {
+      padding: 24px 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .header-inner {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .logo { font-size: 20px; font-weight: 700; letter-spacing: -0.3px; }
+    .logo span { color: var(--accent); }
+
+    .theme-toggle {
+      background: var(--control-bg);
+      border: 1px solid var(--control-border);
+      color: var(--text);
+      padding: 6px 14px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 13px;
+      transition: border-color 0.2s;
+    }
+    .theme-toggle:hover { border-color: var(--accent); }
+
+    /* Controls */
+    .controls {
+      padding: 20px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .control-group {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .control-label {
+      font-size: 12px;
+      color: var(--text-secondary);
+      font-weight: 500;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+
+    select, input[type="date"] {
+      background: var(--control-bg);
+      border: 1px solid var(--control-border);
+      color: var(--text);
+      padding: 6px 10px;
+      border-radius: 6px;
+      font-family: inherit;
+      font-size: 13px;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    select:focus, input[type="date"]:focus { border-color: var(--accent); }
+
+    .custom-dates {
+      display: none;
+      gap: 6px;
+      align-items: center;
+    }
+    .custom-dates.visible { display: flex; }
+    .custom-dates span { color: var(--text-secondary); font-size: 12px; }
+
+    /* Segment pills */
+    .segments {
+      padding: 14px 0;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      border-bottom: 1px solid var(--border);
+    }
+    .pill {
+      background: transparent;
+      border: 1px solid var(--control-border);
+      color: var(--text-secondary);
+      padding: 4px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      font-family: inherit;
+      font-size: 12px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .pill:hover { border-color: var(--accent); color: var(--accent); }
+    .pill.active {
+      background: var(--accent-dim);
+      border-color: var(--accent);
+      color: var(--accent);
+    }
+
+    /* Stats bar */
+    .stats {
+      padding: 14px 0;
+      font-size: 13px;
+      color: var(--text-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+
+    /* News grid */
+    .news-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 14px;
+      padding: 20px 0 40px;
+    }
+    @media (min-width: 640px) { .news-grid { grid-template-columns: repeat(2, 1fr); } }
+    @media (min-width: 960px) { .news-grid { grid-template-columns: repeat(3, 1fr); } }
+
+    /* Card */
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      transition: border-color 0.2s, transform 0.15s;
+    }
+    .card:hover { border-color: var(--accent); transform: translateY(-2px); }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .client-tag {
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-dim);
+      padding: 2px 8px;
+      border-radius: 4px;
+    }
+    .source-badge {
+      font-size: 10px;
+      color: var(--text-secondary);
+      background: var(--control-bg);
+      border: 1px solid var(--control-border);
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+
+    .card-title a {
+      color: var(--text);
+      text-decoration: none;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 1.4;
+      display: -webkit-box;
+      -webkit-line-clamp: 3;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-title a:hover { color: var(--accent); }
+
+    .card-date {
+      font-size: 11px;
+      color: var(--text-secondary);
+    }
+    .card-summary {
+      font-size: 13px;
+      color: var(--text-secondary);
+      line-height: 1.5;
+      display: -webkit-box;
+      -webkit-line-clamp: 4;
+      -webkit-box-orient: vertical;
+      overflow: hidden;
+    }
+    .card-link {
+      font-size: 12px;
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+      margin-top: auto;
+    }
+    .card-link:hover { text-decoration: underline; }
+
+    /* Empty / loading states */
+    .empty-state {
+      text-align: center;
+      padding: 60px 20px;
+      color: var(--text-secondary);
+      font-size: 15px;
+      grid-column: 1 / -1;
+    }
+
+    .skeleton-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 18px;
+      min-height: 200px;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+    .skeleton-bar {
+      background: var(--border);
+      border-radius: 4px;
+      margin-bottom: 10px;
+    }
+    .skeleton-bar.w60 { width: 60%; height: 12px; }
+    .skeleton-bar.w100 { width: 100%; height: 14px; }
+    .skeleton-bar.w80 { width: 80%; height: 10px; }
+    .skeleton-bar.w90 { width: 90%; height: 10px; }
+
+    /* Footer */
+    footer {
+      padding: 20px 0;
+      border-top: 1px solid var(--border);
+      text-align: center;
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="header-inner">
+        <div class="logo"><span>Aralab</span> Client Intelligence</div>
+        <button class="theme-toggle" id="themeToggle">Modo claro</button>
+      </div>
+    </header>
+
+    <div class="controls">
+      <div class="control-group">
+        <span class="control-label">Período</span>
+        <select id="dateRange">
+          <option value="7">Últimos 7 dias</option>
+          <option value="14">Últimos 14 dias</option>
+          <option value="30">Últimos 30 dias</option>
+          <option value="custom">Personalizado</option>
+        </select>
+      </div>
+      <div class="custom-dates" id="customDates">
+        <input type="date" id="dateFrom">
+        <span>a</span>
+        <input type="date" id="dateTo">
+      </div>
+      <div class="control-group">
+        <span class="control-label">Cliente</span>
+        <select id="clientFilter">
+          <option value="all">Todos</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="segments" id="segmentPills"></div>
+
+    <div class="stats" id="statsBar">A carregar...</div>
+
+    <div class="news-grid" id="newsGrid">
+      <div class="skeleton-card"><div class="skeleton-bar w60"></div><div class="skeleton-bar w100"></div><div class="skeleton-bar w80"></div><div class="skeleton-bar w90"></div></div>
+      <div class="skeleton-card"><div class="skeleton-bar w60"></div><div class="skeleton-bar w100"></div><div class="skeleton-bar w80"></div><div class="skeleton-bar w90"></div></div>
+      <div class="skeleton-card"><div class="skeleton-bar w60"></div><div class="skeleton-bar w100"></div><div class="skeleton-bar w80"></div><div class="skeleton-bar w90"></div></div>
+    </div>
+
+    <footer>Aralab Client Intelligence &middot; Actualizado automaticamente todas as segundas-feiras</footer>
+  </div>
+
+  <script>
+    (function () {
+      // ── Clients data (for segment mapping) ──
+      const CLIENTS = [
+        {"name":"Ace Cann","segment":"Cannabis"},
+        {"name":"Airbus","segment":"Aerospace & Defence"},
+        {"name":"Aralab","segment":"Own Brand"},
+        {"name":"Bial","segment":"Pharma"},
+        {"name":"Bluepharma","segment":"Pharma"},
+        {"name":"Bluestabil","segment":"Own Orbit"},
+        {"name":"Bosch Thermotek","segment":"Automotive"},
+        {"name":"CCMar","segment":"Research"},
+        {"name":"CTAG","segment":"Automotive"},
+        {"name":"Fundação Champalimaud","segment":"Research"},
+        {"name":"Coficab","segment":"Industrial"},
+        {"name":"Concessus","segment":"Own Orbit"},
+        {"name":"Ellison Institute","segment":"Research"},
+        {"name":"Greencolab","segment":"Research"},
+        {"name":"Herdade das Barrocas","segment":"Cannabis"},
+        {"name":"Hovione","segment":"Pharma"},
+        {"name":"IGC","segment":"Research"},
+        {"name":"INIAV","segment":"Research"},
+        {"name":"ITQB","segment":"Research"},
+        {"name":"Idiada","segment":"Automotive"},
+        {"name":"Knorr-Bremse","segment":"Automotive"},
+        {"name":"Q1/Cambrex","segment":"Pharma"},
+        {"name":"Red Bull Powertrains","segment":"Automotive"},
+        {"name":"Rheinmetall","segment":"Aerospace & Defence"},
+        {"name":"SNCF","segment":"Transport"},
+        {"name":"Seat","segment":"Automotive"},
+        {"name":"Sofarimex","segment":"Pharma"},
+        {"name":"Tekever","segment":"Aerospace & Defence"},
+        {"name":"Wild Bio","segment":"Cannabis"}
+      ];
+
+      const SEGMENTS = [
+        "All", "Automotive", "Pharma", "Aerospace & Defence", "Research",
+        "Transport", "Industrial", "Cannabis", "Own Brand", "Own Orbit"
+      ];
+
+      const clientSegmentMap = {};
+      CLIENTS.forEach(c => { clientSegmentMap[c.name] = c.segment; });
+
+      // ── State ──
+      let allArticles = [];
+      let activeSegment = "All";
+      let lastUpdate = null;
+
+      // ── Theme ──
+      const body = document.body;
+      const toggle = document.getElementById("themeToggle");
+      const savedTheme = localStorage.getItem("aralab-theme");
+      if (savedTheme === "light") {
+        body.classList.add("light");
+        toggle.textContent = "Modo escuro";
+      }
+      toggle.addEventListener("click", () => {
+        body.classList.toggle("light");
+        const isLight = body.classList.contains("light");
+        toggle.textContent = isLight ? "Modo escuro" : "Modo claro";
+        localStorage.setItem("aralab-theme", isLight ? "light" : "dark");
+      });
+
+      // ── Segment pills ──
+      const pillsContainer = document.getElementById("segmentPills");
+      SEGMENTS.forEach(seg => {
+        const btn = document.createElement("button");
+        btn.className = "pill" + (seg === "All" ? " active" : "");
+        btn.textContent = seg === "All" ? "Todos" : seg;
+        btn.dataset.segment = seg;
+        btn.addEventListener("click", () => {
+          activeSegment = seg;
+          pillsContainer.querySelectorAll(".pill").forEach(p => p.classList.remove("active"));
+          btn.classList.add("active");
+          renderArticles();
+        });
+        pillsContainer.appendChild(btn);
+      });
+
+      // ── Client filter dropdown ──
+      const clientSelect = document.getElementById("clientFilter");
+      CLIENTS.forEach(c => {
+        const opt = document.createElement("option");
+        opt.value = c.name;
+        opt.textContent = c.name;
+        clientSelect.appendChild(opt);
+      });
+      clientSelect.addEventListener("change", renderArticles);
+
+      // ── Date range ──
+      const dateRangeSelect = document.getElementById("dateRange");
+      const customDatesDiv = document.getElementById("customDates");
+      const dateFromInput = document.getElementById("dateFrom");
+      const dateToInput = document.getElementById("dateTo");
+
+      dateRangeSelect.addEventListener("change", () => {
+        if (dateRangeSelect.value === "custom") {
+          customDatesDiv.classList.add("visible");
+        } else {
+          customDatesDiv.classList.remove("visible");
+        }
+        renderArticles();
+      });
+      dateFromInput.addEventListener("change", renderArticles);
+      dateToInput.addEventListener("change", renderArticles);
+
+      // ── Data loading ──
+      async function loadAllNews() {
+        const articles = [];
+        const today = new Date();
+        const fetches = [];
+
+        for (let w = 0; w < 12; w++) {
+          const d = new Date(today);
+          d.setDate(d.getDate() - w * 7);
+          const dateStr = d.toISOString().slice(0, 10);
+          fetches.push(
+            fetch("data/news/" + dateStr + ".json")
+              .then(r => {
+                if (!r.ok) throw new Error("not found");
+                return r.json();
+              })
+              .then(data => {
+                if (Array.isArray(data)) {
+                  articles.push(...data);
+                  if (!lastUpdate || dateStr > lastUpdate) lastUpdate = dateStr;
+                }
+              })
+              .catch(() => {})
+          );
+        }
+
+        // Also try every day in the last 14 days (covers non-Monday runs)
+        for (let d = 0; d < 14; d++) {
+          const date = new Date(today);
+          date.setDate(date.getDate() - d);
+          const dateStr = date.toISOString().slice(0, 10);
+          fetches.push(
+            fetch("data/news/" + dateStr + ".json")
+              .then(r => {
+                if (!r.ok) throw new Error("not found");
+                return r.json();
+              })
+              .then(data => {
+                if (Array.isArray(data)) {
+                  articles.push(...data);
+                  if (!lastUpdate || dateStr > lastUpdate) lastUpdate = dateStr;
+                }
+              })
+              .catch(() => {})
+          );
+        }
+
+        await Promise.all(fetches);
+
+        // Deduplicate by URL
+        const seen = new Set();
+        const unique = [];
+        for (const a of articles) {
+          if (a.url && !seen.has(a.url)) {
+            seen.add(a.url);
+            unique.push(a);
+          }
+        }
+
+        // Sort by date desc
+        unique.sort((a, b) => (b.published_at || "").localeCompare(a.published_at || ""));
+        return unique;
+      }
+
+      // ── Filtering ──
+      function getFilteredArticles() {
+        let filtered = [...allArticles];
+
+        // Segment filter
+        if (activeSegment !== "All") {
+          filtered = filtered.filter(a => clientSegmentMap[a.client_name] === activeSegment);
+        }
+
+        // Client filter
+        const selectedClient = clientSelect.value;
+        if (selectedClient !== "all") {
+          filtered = filtered.filter(a => a.client_name === selectedClient);
+        }
+
+        // Date range filter
+        const rangeVal = dateRangeSelect.value;
+        let fromDate, toDate;
+        const now = new Date();
+        toDate = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59);
+
+        if (rangeVal === "custom") {
+          const fv = dateFromInput.value;
+          const tv = dateToInput.value;
+          if (fv) fromDate = new Date(fv + "T00:00:00");
+          if (tv) toDate = new Date(tv + "T23:59:59");
+        } else {
+          const days = parseInt(rangeVal, 10);
+          fromDate = new Date(now);
+          fromDate.setDate(fromDate.getDate() - days);
+          fromDate.setHours(0, 0, 0, 0);
+        }
+
+        if (fromDate) {
+          filtered = filtered.filter(a => {
+            const d = new Date(a.published_at);
+            return d >= fromDate && d <= toDate;
+          });
+        }
+
+        return filtered;
+      }
+
+      // ── Rendering ──
+      function renderArticles() {
+        const grid = document.getElementById("newsGrid");
+        const stats = document.getElementById("statsBar");
+        const filtered = getFilteredArticles();
+
+        if (allArticles.length === 0) {
+          grid.innerHTML = '<div class="empty-state">Ainda sem notícias. O sistema corre todas as segundas-feiras de manhã.</div>';
+          stats.textContent = "Sem dados disponíveis";
+          return;
+        }
+
+        if (filtered.length === 0) {
+          grid.innerHTML = '<div class="empty-state">Nenhum artigo encontrado para os filtros seleccionados.</div>';
+          const clientSet = new Set(allArticles.map(a => a.client_name));
+          stats.textContent = `${allArticles.length} artigos · ${clientSet.size} clientes · última actualização ${lastUpdate || "—"}`;
+          return;
+        }
+
+        const clientSet = new Set(filtered.map(a => a.client_name));
+        stats.textContent = `${filtered.length} artigos · ${clientSet.size} clientes · última actualização ${lastUpdate || "—"}`;
+
+        grid.innerHTML = filtered.map(a => {
+          const pubDate = (a.published_at || "").slice(0, 10);
+          const title = a.title_pt || a.title || "Sem título";
+          const summary = a.summary_pt || "";
+          const source = a.source_name || "";
+          const client = a.client_name || "";
+          const url = a.url || "#";
+
+          return `<div class="card">
+            <div class="card-header">
+              <span class="client-tag">${escHtml(client)}</span>
+              <span class="source-badge">${escHtml(source)}</span>
+            </div>
+            <div class="card-title"><a href="${escAttr(url)}" target="_blank" rel="noopener">${escHtml(title)}</a></div>
+            <div class="card-date">${escHtml(pubDate)}</div>
+            <div class="card-summary">${escHtml(summary)}</div>
+            <a class="card-link" href="${escAttr(url)}" target="_blank" rel="noopener">Ler artigo &rarr;</a>
+          </div>`;
+        }).join("");
+      }
+
+      function escHtml(s) {
+        const d = document.createElement("div");
+        d.textContent = s;
+        return d.innerHTML;
+      }
+
+      function escAttr(s) {
+        return s.replace(/&/g, "&amp;").replace(/"/g, "&quot;").replace(/'/g, "&#39;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+      }
+
+      // ── Init ──
+      loadAllNews().then(articles => {
+        allArticles = articles;
+        renderArticles();
+      });
+    })();
+  </script>
+</body>
+</html>
