@@ -25,7 +25,7 @@ CLIENTS_PATH = BASE_DIR / "data" / "clients.json"
 SOURCES_PATH = BASE_DIR / "data" / "sources.json"
 NEWS_DIR = BASE_DIR / "data" / "news"
 
-NEWSAPI_KEY = os.environ.get("NEWSAPI_KEY", "")
+GNEWS_KEY = os.environ.get("GNEWS_KEY", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 GMAIL_USER = os.environ.get("GMAIL_USER", "")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
@@ -78,7 +78,7 @@ def fetch_articles_for_client(client: dict, domains: str, from_date: str) -> lis
         "language": "en",
         "sortBy": "relevancy",
         "pageSize": 10,
-        "apiKey": NEWSAPI_KEY,
+        "apiKey": GNEWS_KEY,
     }
     resp = requests.get(NEWSAPI_URL, params=params, timeout=30)
     resp.raise_for_status()
@@ -253,8 +253,8 @@ def main():
 
     # Validate required env vars
     missing = []
-    if not NEWSAPI_KEY:
-        missing.append("NEWSAPI_KEY")
+    if not GNEWS_KEY:
+        missing.append("GNEWS_KEY")
     if not ANTHROPIC_API_KEY:
         missing.append("ANTHROPIC_API_KEY")
     if missing:
