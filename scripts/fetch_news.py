@@ -31,7 +31,7 @@ GMAIL_USER = os.environ.get("GMAIL_USER", "")
 GMAIL_APP_PASSWORD = os.environ.get("GMAIL_APP_PASSWORD", "")
 RECIPIENT_EMAIL = os.environ.get("RECIPIENT_EMAIL", "")
 
-NEWSAPI_URL = "https://newsapi.org/v2/everything"
+GNEWS_URL = "https://gnews.io/api/v4/search"
 CLAUDE_MODEL = "claude-haiku-4-5-20251001"
 BATCH_SIZE = 20
 
@@ -71,16 +71,15 @@ def save_json(path: Path, data: list) -> None:
 def fetch_articles_for_client(client: dict, domains: str, from_date: str) -> list:
     """Fetch articles from NewsAPI for a single client."""
     query = client["aliases"][0]
-    params = {
-        "q": query,
-        "domains": domains,
-        "from": from_date,
-        "language": "en",
-        "sortBy": "relevancy",
-        "pageSize": 10,
-        "apiKey": GNEWS_KEY,
-    }
-    resp = requests.get(NEWSAPI_URL, params=params, timeout=30)
+params = {
+    "q": query,
+    "token": GNEWS_KEY,
+    "max": 10,
+    "sortby": "publishedAt",
+    "from": from_date + "T00:00:00Z",
+    "lang": "pt,en",
+}
+resp = requests.get(GNEWS_URL, params=params, timeout=30)
     resp.raise_for_status()
     data = resp.json()
 
