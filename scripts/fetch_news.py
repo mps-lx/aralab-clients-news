@@ -2,8 +2,9 @@
 """
 Aralab Client Intelligence — Weekly News Fetcher
 
-Monitors business press for Aralab clients, filters with Claude,
-translates non-PT/EN content, and delivers a digest via email.
+Monitors business press for Aralab clients via GNews API,
+filters with Claude Haiku, translates non-PT/EN content,
+and delivers a digest via email.
 """
 
 import json
@@ -14,6 +15,7 @@ from datetime import datetime, timedelta
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from pathlib import Path
+from urllib.parse import urlencode
 
 import anthropic
 import requests
@@ -57,6 +59,16 @@ SYSTEM_PROMPT = (
 
 # ── Helpers ──────────────────────────────────────────────────────────────────
 
+def log(msg: str) -> None:
+    print(f"[DEBUG] {msg}", flush=True)
+
+
+def mask_token(token: str) -> str:
+    if len(token) <= 4:
+        return "****"
+    return "****" + token[-4:]
+
+
 def load_json(path: Path) -> list:
     with open(path, "r", encoding="utf-8") as f:
         return json.load(f)
@@ -68,6 +80,8 @@ def save_json(path: Path, data: list) -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
+# ── GNews Fetch ──────────────────────────────────────────────────────────────
+
 def fetch_articles_for_client(client: dict, from_date: str) -> list:
     """Fetch articles from GNews API for a single client."""
     query = client["aliases"][0]
@@ -78,9 +92,25 @@ def fetch_articles_for_client(client: dict, from_date: str) -> list:
         "sortby": "publishedAt",
         "from": from_date + "T00:00:00Z",
     }
+
+    # Build debug URL with masked token
+    debug_params = {**params, "token": mask_token(GNEWS_KEY)}
+    debug_url = f"{GNEWS_URL}?{urlencode(debug_params)}"
+    log(f"GET {debug_url}")
+
     resp = requests.get(GNEWS_URL, params=params, timeout=30)
-    resp.raise_for_status()
+    log(f"Response: HTTP {resp.status_code}")
+
+    if resp.status_code != 200:
+        log(f"Response body: {resp.text[:500]}")
+        resp.raise_for_status()
+
     data = resp.json()
+    raw_count = len(data.get("articles", []))
+    log(f"GNews returned {raw_count} raw articles for \"{query}\"")
+
+    if raw_count == 0:
+        log(f"No articles found. Full response: {json.dumps(data, ensure_ascii=False)[:300]}")
 
     articles = []
     for art in data.get("articles", []):
@@ -95,23 +125,7 @@ def fetch_articles_for_client(client: dict, from_date: str) -> list:
     return articles
 
 
-def filter_by_sources(articles: list, sources: list) -> list:
-    """Keep articles from known sources. If no sources configured, keep all."""
-    if not sources:
-        return articles
-    domains = [s["domain"].lower() for s in sources]
-    matched = []
-    unmatched = []
-    for art in articles:
-        url = art.get("url", "").lower()
-        source_name = art.get("source_name", "").lower()
-        if any(d in url or d.replace(".", " ") in source_name for d in domains):
-            matched.append(art)
-        else:
-            unmatched.append(art)
-    # Keep all articles — matched sources first, then the rest
-    return matched + unmatched
-
+# ── Dedup & Source Matching ──────────────────────────────────────────────────
 
 def deduplicate_articles(articles: list) -> list:
     """Remove duplicate articles by URL."""
@@ -125,17 +139,41 @@ def deduplicate_articles(articles: list) -> list:
     return unique
 
 
+def filter_by_sources(articles: list, sources: list) -> list:
+    """Prioritise articles from known sources. All articles are kept."""
+    if not sources:
+        return articles
+    domains = [s["domain"].lower() for s in sources]
+    matched = []
+    unmatched = []
+    for art in articles:
+        url = art.get("url", "").lower()
+        source_name = art.get("source_name", "").lower()
+        if any(d in url or d.replace(".", " ") in source_name for d in domains):
+            matched.append(art)
+        else:
+            unmatched.append(art)
+    log(f"Source filter: {len(matched)} from known sources, {len(unmatched)} other — all kept")
+    return matched + unmatched
+
+
+# ── Claude Filtering ─────────────────────────────────────────────────────────
+
 def filter_with_claude(articles: list) -> list:
     """Send articles to Claude for relevance filtering and translation."""
     if not articles:
+        log("No articles to filter, skipping Claude call")
         return []
 
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
     relevant = []
+    total_batches = (len(articles) + BATCH_SIZE - 1) // BATCH_SIZE
 
-    # Process in batches
     for i in range(0, len(articles), BATCH_SIZE):
         batch = articles[i : i + BATCH_SIZE]
+        batch_num = i // BATCH_SIZE + 1
+        log(f"Claude batch {batch_num}/{total_batches}: sending {len(batch)} articles")
+
         user_message = json.dumps(batch, ensure_ascii=False, indent=2)
 
         try:
@@ -146,36 +184,50 @@ def filter_with_claude(articles: list) -> list:
                 messages=[{"role": "user", "content": user_message}],
             )
 
-            # Extract text from response
             text = ""
             for block in response.content:
                 if block.type == "text":
                     text += block.text
 
-            # Parse JSON from response
+            log(f"Claude batch {batch_num} response length: {len(text)} chars")
+
             text = text.strip()
-            # Handle cases where model wraps in markdown code block
             if text.startswith("```"):
                 lines = text.split("\n")
                 lines = [l for l in lines if not l.startswith("```")]
                 text = "\n".join(lines)
 
             parsed = json.loads(text)
-            for item in parsed:
-                if item.get("relevant", False):
-                    relevant.append(item)
 
-        except (json.JSONDecodeError, KeyError) as e:
-            print(f"  [WARN] Failed to parse Claude response for batch {i // BATCH_SIZE + 1}: {e}")
+            batch_relevant = 0
+            batch_irrelevant = 0
+            for item in parsed:
+                is_relevant = item.get("relevant", False)
+                title = item.get("title_pt", item.get("title", "?"))[:80]
+                client_name = item.get("client_name", "?")
+                if is_relevant:
+                    batch_relevant += 1
+                    log(f"  RELEVANT: [{client_name}] {title}")
+                    relevant.append(item)
+                else:
+                    batch_irrelevant += 1
+                    log(f"  IRRELEVANT: [{client_name}] {title}")
+
+            log(f"Claude batch {batch_num} result: {batch_relevant} relevant, {batch_irrelevant} irrelevant")
+
+        except json.JSONDecodeError as e:
+            log(f"WARN: Failed to parse Claude JSON for batch {batch_num}: {e}")
+            log(f"Raw response (first 500 chars): {text[:500]}")
         except anthropic.APIError as e:
-            print(f"  [WARN] Claude API error for batch {i // BATCH_SIZE + 1}: {e}")
+            log(f"WARN: Claude API error for batch {batch_num}: {e}")
 
     return relevant
 
 
+# ── Email ────────────────────────────────────────────────────────────────────
+
 def build_email_html(articles: list, date_str: str) -> str:
     """Build the HTML email digest."""
-
     if not articles:
         return f"""<!DOCTYPE html>
 <html>
@@ -191,7 +243,6 @@ def build_email_html(articles: list, date_str: str) -> str:
 </body>
 </html>"""
 
-    # Group articles by client
     by_client = {}
     for art in articles:
         cn = art.get("client_name", "Unknown")
@@ -240,9 +291,10 @@ def build_email_html(articles: list, date_str: str) -> str:
 def send_email(subject: str, html_body: str) -> bool:
     """Send an HTML email via Gmail SMTP."""
     if not all([GMAIL_USER, GMAIL_APP_PASSWORD, RECIPIENT_EMAIL]):
-        print("[WARN] Email credentials not configured. Skipping email send.")
+        log("Email credentials not configured — skipping send")
         return False
 
+    log(f"Sending email to {RECIPIENT_EMAIL}")
     msg = MIMEMultipart("alternative")
     msg["From"] = GMAIL_USER
     msg["To"] = RECIPIENT_EMAIL
@@ -254,9 +306,10 @@ def send_email(subject: str, html_body: str) -> bool:
             server.starttls()
             server.login(GMAIL_USER, GMAIL_APP_PASSWORD)
             server.sendmail(GMAIL_USER, RECIPIENT_EMAIL, msg.as_string())
+        log("Email sent successfully")
         return True
     except smtplib.SMTPException as e:
-        print(f"[ERROR] Failed to send email: {e}")
+        log(f"ERROR: Failed to send email: {e}")
         return False
 
 
@@ -267,7 +320,13 @@ def main():
     print("  Aralab Client Intelligence — Weekly News Fetch")
     print("=" * 60)
 
-    # Validate required env vars
+    # Validate env vars
+    log(f"GNEWS_KEY present: {'yes (' + mask_token(GNEWS_KEY) + ')' if GNEWS_KEY else 'NO'}")
+    log(f"ANTHROPIC_API_KEY present: {'yes' if ANTHROPIC_API_KEY else 'NO'}")
+    log(f"GMAIL_USER present: {'yes' if GMAIL_USER else 'NO'}")
+    log(f"GMAIL_APP_PASSWORD present: {'yes' if GMAIL_APP_PASSWORD else 'NO'}")
+    log(f"RECIPIENT_EMAIL present: {'yes (' + RECIPIENT_EMAIL + ')' if RECIPIENT_EMAIL else 'NO'}")
+
     missing = []
     if not GNEWS_KEY:
         missing.append("GNEWS_KEY")
@@ -286,63 +345,64 @@ def main():
     from_date = (today - timedelta(days=7)).strftime("%Y-%m-%d")
     date_str = today.strftime("%Y-%m-%d")
 
-    print(f"\nDate: {date_str}")
-    print(f"Active clients: {len(active_clients)}")
-    print(f"Sources: {len(sources)}")
-    print(f"Fetching articles from: {from_date}\n")
+    log(f"Date: {date_str}")
+    log(f"From date: {from_date}")
+    log(f"Active clients: {len(active_clients)}")
+    log(f"Sources loaded: {len(sources)}")
+    print()
 
     # Fetch articles for each client
     all_articles = []
     errors = 0
 
-    for client in active_clients:
+    for idx, client in enumerate(active_clients, 1):
+        print(f"[{idx}/{len(active_clients)}] {client['name']}")
         try:
-            print(f"  Fetching: {client['name']} (query: \"{client['aliases'][0]}\")")
             articles = fetch_articles_for_client(client, from_date)
-            print(f"    → {len(articles)} articles")
+            log(f"Kept {len(articles)} articles for {client['name']}")
             all_articles.extend(articles)
         except requests.RequestException as e:
-            print(f"    → [ERROR] {e}")
+            log(f"ERROR: HTTP request failed for {client['name']}: {e}")
+            if hasattr(e, "response") and e.response is not None:
+                log(f"Response status: {e.response.status_code}")
+                log(f"Response body: {e.response.text[:500]}")
             errors += 1
         except Exception as e:
-            print(f"    → [ERROR] Unexpected: {e}")
+            log(f"ERROR: Unexpected failure for {client['name']}: {type(e).__name__}: {e}")
             errors += 1
+        print()
 
     # Deduplicate
     total_raw = len(all_articles)
     all_articles = deduplicate_articles(all_articles)
     total_deduped = len(all_articles)
-    print(f"\nTotal articles: {total_raw} raw → {total_deduped} after dedup")
+    log(f"Dedup: {total_raw} raw → {total_deduped} unique")
 
-    # Source filtering (known sources prioritised, all kept)
+    # Source matching (all articles kept, known sources first)
     all_articles = filter_by_sources(all_articles, sources)
-    known = sum(
-        1 for a in all_articles
-        if any(d in a.get("url", "").lower() for d in [s["domain"].lower() for s in sources])
-    )
-    print(f"Source match: {known} from known sources, {total_deduped - known} other")
 
-    # Filter with Claude
-    print(f"\nFiltering {total_deduped} articles with Claude ({CLAUDE_MODEL})...")
+    # Claude filtering
+    log(f"Sending {total_deduped} articles to Claude ({CLAUDE_MODEL}) in batches of {BATCH_SIZE}")
     relevant_articles = filter_with_claude(all_articles)
 
-    # Sort by published_at descending
+    # Sort by date
     relevant_articles.sort(key=lambda x: x.get("published_at", ""), reverse=True)
-    print(f"Relevant articles: {len(relevant_articles)}")
+    log(f"Final relevant articles: {len(relevant_articles)}")
 
-    # Save to file
+    # Save JSON
     output_path = NEWS_DIR / f"{date_str}.json"
     save_json(output_path, relevant_articles)
-    print(f"\nSaved to: {output_path}")
+    log(f"Saved to: {output_path}")
 
-    # Build and send email
+    # Email
     subject = f"Aralab Client Intelligence — Semana de {date_str}"
     html_body = build_email_html(relevant_articles, date_str)
     email_sent = send_email(subject, html_body)
 
     # Summary
     client_names_with_news = set(a.get("client_name") for a in relevant_articles)
-    print("\n" + "=" * 60)
+    print()
+    print("=" * 60)
     print("  SUMMARY")
     print("=" * 60)
     print(f"  Clients checked:     {len(active_clients)}")
